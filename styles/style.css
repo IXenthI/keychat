@@ -143,6 +143,8 @@ body {
 .source_shared {
     background: rgba(255, 255, 255, 0.18);
     color: rgba(255, 255, 255, 0.8);
+    font-weight: 700;
+    text-transform: none;
 }
 
 .kick_badge {

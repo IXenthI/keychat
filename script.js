@@ -23,6 +23,8 @@ Chat = {
         kickChannels: [],       // all joined Kick channels
         channelIDs: {},         // twitch login -> numeric room id (from ROOMSTATE)
         roomNames: {},          // twitch room id -> login (for Shared Chat labels)
+        sharedActive: false,    // a Shared Chat session is in progress
+        sharedColors: {},       // room id -> a consistent accent color per channel
         roomStates: {},         // twitch login -> last seen mode flags
         multiSource: false,     // more than one chat source -> show per-message source chips
         mentionName: null,
@@ -793,12 +795,23 @@ Chat = {
                     .addClass('source_tag ' + (isKick ? 'source_kick' : 'source_twitch'))
                     .text(source.channel || (isKick ? 'kick' : 'twitch')));
             }
-            // Shared Chat (Twitch collab sessions): label messages relayed from another room
-            if (!isKick && typeof info['source-room-id'] === 'string' && info['source-room-id'] &&
-                info['source-room-id'] !== Chat.info.channelIDs[source.channel]) {
-                var srcName = Chat.info.roomNames[info['source-room-id']];
-                $userInfo.append($('<span></span>').addClass('source_tag source_shared').text(srcName || 'shared'));
-                if (srcName === undefined) Chat.resolveRoomName(info['source-room-id']);
+            // Shared Chat (Twitch collab sessions): color-code every message by its origin
+            // channel so communities are instantly distinguishable — a colored pill naming
+            // the channel plus a matching left stripe, one consistent color per channel.
+            if (!isKick) {
+                var localRoom = Chat.info.channelIDs[source.channel];
+                var srcRoom = (typeof info['source-room-id'] === 'string' && info['source-room-id']) ? info['source-room-id'] : localRoom;
+                if (srcRoom && localRoom && srcRoom !== localRoom) Chat.info.sharedActive = true;
+                if (Chat.info.sharedActive && srcRoom && localRoom) {
+                    var isForeign = srcRoom !== localRoom;
+                    var col = Chat.sharedColor(srcRoom);
+                    $chatLine.addClass('shared_msg').css('box-shadow', 'inset 4px 0 0 ' + col);
+                    var srcName = isForeign ? (Chat.info.roomNames[srcRoom] || '…') : source.channel;
+                    $userInfo.append($('<span></span>').addClass('source_tag source_shared')
+                        .attr('data-room', String(srcRoom).replace(/[^0-9]/g, ''))
+                        .css({ 'background': col, 'color': '#0e0e10' }).text(srcName));
+                    if (isForeign && Chat.info.roomNames[srcRoom] === undefined) Chat.resolveRoomName(srcRoom);
+                }
             }
             if (Chat.info.avatars && (!isKick || Chat.info.demo)) {
                 var avatar = Chat.info.userAvatars[nick];
@@ -1076,6 +1089,9 @@ Chat = {
         Chat.info.mentionName = 'demo';
         // Show source chips in the preview when the configured setup is multi-source
         Chat.info.multiSource = ('kick' in $.QueryString && $.QueryString.kick.length > 0) || ($.QueryString.channel || '').indexOf(',') > -1;
+        // Fake room ids so the preview can demonstrate Shared Chat color-coding
+        Chat.info.channelIDs['demo'] = '1';
+        Chat.info.roomNames = { '1': 'demo', '2': 'AllyStreamer', '3': 'CoStreamer' };
         Chat.load(function() {
             Chat.loadGlobalEmotes();
             Chat.setupEmoteTooltips();
@@ -1140,6 +1156,9 @@ Chat = {
                 if (i === 4) Chat.writeEvent('🎉', '12 raiders from PixelPal have joined!', 'raid');
                 if (i === 6) Chat.writeEvent('🐌', 'Slow mode: 10s', 'mode');
                 if (i === 8) Chat.writeEvent('🔮', 'Dessieed redeemed Hero Request (5,000)', 'redeem');
+                // Shared Chat demo: messages relayed from two other channels, color-coded
+                if (i === 9) Chat.write('allyfan', { id: 'demo-s1', color: '#00c8af', 'display-name': 'AllyFan', 'source-room-id': '2' }, 'hi from the other stream! {e}'.replace('{e}', (Object.keys(Chat.info.emotes)[0] || '👋')), { platform: 'twitch', channel: 'demo' });
+                if (i === 10) Chat.write('cofan22', { id: 'demo-s2', color: '#ff6ac1', 'display-name': 'CoFan22', 'source-room-id': '3' }, 'shared chat gang', { platform: 'twitch', channel: 'demo' });
                 if (i === 5) Chat.write('replyfan', { id: 'demo-r' + i, color: '#FF4500', 'display-name': 'ReplyFan', 'reply-parent-display-name': 'PixelPal', 'reply-parent-user-login': 'pixelpal', 'reply-parent-msg-body': 'welcome to the keychat preview' }, '@PixelPal thanks!');
                 if (i === 7) Chat.write('vipviewer', { id: 'demo-rd' + i, color: '#1E90FF', 'display-name': 'VIPViewer', 'custom-reward-id': 'demo' }, 'redeemed a reward to say this');
                 if (i === 3 && Chat.info.multiSource) {
@@ -1418,9 +1437,21 @@ Chat = {
         Chat.info.roomNames[roomId] = null; // pending
         $.getJSON('https://api.ivr.fi/v2/twitch/user?id=' + encodeURIComponent(roomId))
             .done(function(res) {
-                Chat.info.roomNames[roomId] = (res && res[0] && res[0].login) || 'shared';
+                var name = (res && res[0] && res[0].login) || 'shared';
+                Chat.info.roomNames[roomId] = name;
+                // Patch chips already rendered while the lookup was pending
+                $('.source_shared[data-room="' + String(roomId).replace(/[^0-9]/g, '') + '"]').text(name);
             })
             .fail(function() { Chat.info.roomNames[roomId] = 'shared'; });
+    },
+
+    // A consistent, distinct accent color per participating channel in a Shared Chat
+    sharedColor: function(roomId) {
+        if (!Chat.info.sharedColors[roomId]) {
+            var palette = ['#9147ff', '#00c8af', '#ff6ac1', '#ffb31a', '#2e9df7', '#53fc18', '#ff5a5a', '#c98bff'];
+            Chat.info.sharedColors[roomId] = palette[Object.keys(Chat.info.sharedColors).length % palette.length];
+        }
+        return Chat.info.sharedColors[roomId];
     },
 
     // Chat-mode notices (emote-only, sub-only, followers-only, slow, unique) from ROOMSTATE diffs

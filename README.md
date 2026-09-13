@@ -71,7 +71,7 @@ Moderators or the broadcaster can type `!refreshoverlay` in chat to reload emote
 | 7TV / BTTV / FFZ emotes (global + channel), zero-width stacking | ✅ |
 | Kick chat (emotes, badges, deletions/bans) merged with Twitch | ✅ |
 | Multi-channel Twitch merge with per-message source chips | ✅ |
-| Twitch Shared Chat labeling (and de-duplication when both rooms are joined) | ✅ |
+| Twitch Shared Chat: per-channel color-coding (colored pill + stripe) so communities are distinguishable | ✅ |
 | Chat-mode notices (slow / emote-only / sub-only / followers-only toggles) | ✅ |
 | Channel-point redemptions with reward name + cost (broadcaster only, via EventSub) | ✅ |
 | Theme presets (bubbles, compact, right-aligned) | ✅ |
