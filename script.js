@@ -795,22 +795,20 @@ Chat = {
                     .addClass('source_tag ' + (isKick ? 'source_kick' : 'source_twitch'))
                     .text(source.channel || (isKick ? 'kick' : 'twitch')));
             }
-            // Shared Chat (Twitch collab sessions): color-code every message by its origin
-            // channel so communities are instantly distinguishable — a colored pill naming
-            // the channel plus a matching left stripe, one consistent color per channel.
+            // Shared Chat (Twitch collab): only mark messages relayed IN from ANOTHER
+            // channel — a colored pill naming that channel + matching left stripe, one
+            // consistent color per channel. Your own channel's messages stay normal, so
+            // the incoming ones stand out instead of your own name repeating on every line.
             if (!isKick) {
                 var localRoom = Chat.info.channelIDs[source.channel];
-                var srcRoom = (typeof info['source-room-id'] === 'string' && info['source-room-id']) ? info['source-room-id'] : localRoom;
-                if (srcRoom && localRoom && srcRoom !== localRoom) Chat.info.sharedActive = true;
-                if (Chat.info.sharedActive && srcRoom && localRoom) {
-                    var isForeign = srcRoom !== localRoom;
+                var srcRoom = info['source-room-id'];
+                if (typeof srcRoom === 'string' && srcRoom && localRoom && srcRoom !== localRoom) {
                     var col = Chat.sharedColor(srcRoom);
                     $chatLine.addClass('shared_msg').css('box-shadow', 'inset 4px 0 0 ' + col);
-                    var srcName = isForeign ? (Chat.info.roomNames[srcRoom] || '…') : source.channel;
                     $userInfo.append($('<span></span>').addClass('source_tag source_shared')
                         .attr('data-room', String(srcRoom).replace(/[^0-9]/g, ''))
-                        .css({ 'background': col, 'color': '#0e0e10' }).text(srcName));
-                    if (isForeign && Chat.info.roomNames[srcRoom] === undefined) Chat.resolveRoomName(srcRoom);
+                        .css({ 'background': col, 'color': '#0e0e10' }).text(Chat.info.roomNames[srcRoom] || '…'));
+                    if (Chat.info.roomNames[srcRoom] === undefined) Chat.resolveRoomName(srcRoom);
                 }
             }
             if (Chat.info.avatars && (!isKick || Chat.info.demo)) {
