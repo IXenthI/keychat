@@ -32,7 +32,7 @@ file:///C:/path/to/keychat/index.html?channel=yourtwitchname&bg=dark&size=2&font
 |---|---|---|---|
 | `channel` | Twitch login name(s), comma separated | — | Whose chat to show; `a,b` merges channels with source chips |
 | `kick` | Kick channel name(s) | — | Kick chat, merged alongside Twitch (either param alone works too) |
-| `theme` | `bubbles`, `compact`, `right` | default | Message style preset |
+| `theme` | `twitch`, `bubbles`, `compact`, `right` | default | Message style preset (`twitch` = near-native Twitch chat look) |
 | `avatars` | `true`/`false` | `false` | Twitch profile pictures next to names |
 | `dock` | `true`/`false` | `false` | Scrollable top-down chat like the real Twitch panel (auto-on with `mod`) |
 | `bg` | `dark`, `gray`, `light`, or hex like `18181b` | transparent | Solid background; use for OBS docks (`black` still works as an alias) |

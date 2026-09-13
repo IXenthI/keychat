@@ -502,7 +502,15 @@ Chat = {
                 '.avatar { height: 0.9em; width: 0.9em; }\n' +
                 '.colon { margin-right: 0.3em !important; }\n' +
                 '.chat_line.first_msg, .chat_line.highlighted, .chat_line.mentioned, .chat_line.event_line { padding: 0 4px; margin: 1px 0 !important; }\n',
-            right: '.chat_line { text-align: right; } .chat_line.event_line { box-shadow: inset -3px 0 0 #b8b8be; }\n'
+            right: '.chat_line { text-align: right; } .chat_line.event_line { box-shadow: inset -3px 0 0 #b8b8be; }\n',
+            // Near-native Twitch chat: Inter font, normal weight, bold names, tight
+            // spacing, subtle row hover — but keeps all KeyChat features (7TV emotes etc.)
+            twitch: '#chat_container { font-weight: 400; font-family: "Inter", "Segoe UI", Roboto, sans-serif; }\n' +
+                '.chat_line { line-height: 1.4; padding: 5px 20px 5px 10px; }\n' +
+                '.nick { font-weight: 700; }\n' +
+                '.message, .event_text { font-weight: 400; }\n' +
+                '.colon { margin-right: 0.15em !important; }\n' +
+                'body.dock .chat_line:hover { background: rgba(255,255,255,0.055); }\n'
         };
         if (Chat.info.theme && themes[Chat.info.theme]) {
             extraCSS += themes[Chat.info.theme];

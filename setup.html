@@ -142,7 +142,7 @@
       <div>
         <div class="opt"><label>Emote scale</label><div class="ctl"><input type="number" id="emote_scale" placeholder="1" min="0.5" max="3" step="0.25"></div></div>
         <div class="opt"><label>Theme</label><div class="ctl"><select id="theme">
-          <option value="">Default</option><option value="bubbles">Bubbles</option>
+          <option value="">Default (overlay)</option><option value="twitch">Twitch (native look)</option><option value="bubbles">Bubbles</option>
           <option value="compact">Compact</option><option value="right">Right-aligned</option>
         </select></div></div>
         <div class="opt"><label>Background</label><div class="ctl">
@@ -340,6 +340,18 @@
     ['dock', 'timestamps', 'links'].forEach(function(id) { $(id).checked = solid; });
     if (solid) $('dockgrp').open = true; // reveal what just got auto-selected
     refresh();
+  });
+
+  // The "Twitch (native look)" theme is a dock look — set it up like real Twitch chat
+  $('theme').addEventListener('change', function() {
+    if ($('theme').value === 'twitch') {
+      $('size').value = '1';           // Twitch chat is small
+      $('dock').checked = true;        // scrollable top-down
+      $('timestamps').checked = true;  // Twitch shows them in most views
+      if ($('bg').value === '') { $('bg').value = 'dark'; $('links').checked = true; }
+      $('dockgrp').open = true;
+      refresh();
+    }
   });
 
   $('copy').addEventListener('click', function() {
