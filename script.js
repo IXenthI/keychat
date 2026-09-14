@@ -1360,10 +1360,11 @@ Chat = {
     // Bottom chat box: talk in the primary channel straight from the dock
     setupChatBox: function() {
         var $bar = $('<div id="chat_input_bar"></div>');
+        var $emoteBtn = $('<button id="emote_btn" title="Emotes">😀</button>');
         var $input = $('<input id="chat_input" maxlength="500" autocomplete="off">')
             .attr('placeholder', 'Chat as ' + Chat.auth.login + ' in #' + Chat.info.channel);
         var $send = $('<button id="chat_send">➤</button>');
-        $bar.append($input).append($send).appendTo('body');
+        $bar.append($emoteBtn).append($input).append($send).appendTo('body');
         document.body.classList.add('has-input');
         if (!Chat.info.dock) $('<style></style>').text('#chat_container { bottom: 46px; }').appendTo('head');
         var send = function() {
@@ -1381,6 +1382,51 @@ Chat = {
         };
         $send.on('click', send);
         $input.on('keydown', function(e) { if (e.key === 'Enter') send(); });
+
+        // Emote picker: searchable grid of the loaded 7TV/BTTV/FFZ emotes; click inserts
+        // the emote's name into the input (which is all Twitch needs to send it)
+        var $panel = $('<div id="emote_panel" hidden></div>');
+        var $search = $('<input id="emote_search" placeholder="Search emotes…" autocomplete="off">');
+        var $grid = $('<div id="emote_grid"></div>');
+        $panel.append($search).append($grid).appendTo('body');
+
+        var insertEmote = function(name) {
+            var cur = $input.val();
+            $input.val((cur ? cur.replace(/\s*$/, '') + ' ' : '') + name + ' ');
+            $input.focus();
+        };
+        var renderGrid = function(filter) {
+            $grid.empty();
+            filter = (filter || '').toLowerCase();
+            var groups = { '7TV': [], 'BTTV': [], 'FFZ': [] };
+            Object.keys(Chat.info.emotes).sort().forEach(function(name) {
+                if (filter && name.toLowerCase().indexOf(filter) === -1) return;
+                var e = Chat.info.emotes[name];
+                (groups[e.provider] || (groups[e.provider] = [])).push(name);
+            });
+            var total = 0;
+            Object.keys(groups).forEach(function(prov) {
+                if (!groups[prov].length) return;
+                $grid.append($('<div class="emote_group_label"></div>').text(prov + ' (' + groups[prov].length + ')'));
+                var $g = $('<div class="emote_group"></div>');
+                groups[prov].slice(0, 400).forEach(function(name) {
+                    total++;
+                    $('<img class="picker_emote">').attr('src', Chat.info.emotes[name].image).attr('title', name).attr('alt', name)
+                        .on('click', function() { insertEmote(name); }).appendTo($g);
+                });
+                $grid.append($g);
+            });
+            if (!total) $grid.append($('<div class="emote_none">No emotes — the channel\'s sets may still be loading</div>'));
+        };
+        $emoteBtn.on('click', function(e) {
+            e.stopPropagation();
+            if ($panel[0].hidden) { renderGrid($search.val()); $panel[0].hidden = false; $search.focus(); }
+            else $panel[0].hidden = true;
+        });
+        $search.on('input', function() { renderGrid($search.val()); });
+        $(document).on('click', function(e) {
+            if (!$panel[0].hidden && !$panel[0].contains(e.target) && e.target !== $emoteBtn[0]) $panel[0].hidden = true;
+        });
     },
 
     // Hover tooltip for emotes: enlarged preview + name + provider/origin, like the

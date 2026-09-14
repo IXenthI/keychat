@@ -393,6 +393,101 @@ body.dock #chat_container::-webkit-scrollbar-thumb {
     font-size: 14px;
 }
 
+#emote_btn {
+    background: #26262c;
+    border: 1px solid #3a3a3d;
+    border-radius: 6px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+}
+
+#emote_btn:hover {
+    background: #3a3a3d;
+}
+
+/* Emote picker panel — anchored above the input bar */
+#emote_panel {
+    position: fixed;
+    left: 8px;
+    bottom: 48px;
+    width: 320px;
+    max-width: calc(100% - 16px);
+    max-height: 320px;
+    display: flex;
+    flex-direction: column;
+    background: #1a1a1e;
+    border: 1px solid #3a3a3d;
+    border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+    z-index: 20;
+    font-family: 'Segoe UI', Roboto, sans-serif;
+}
+
+#emote_search {
+    margin: 8px;
+    background: #26262c;
+    color: #efeff1;
+    border: 1px solid #3a3a3d;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 13px;
+}
+
+#emote_search:focus {
+    outline: 2px solid #9147ff;
+}
+
+#emote_grid {
+    overflow-y: auto;
+    padding: 0 8px 8px;
+}
+
+#emote_grid::-webkit-scrollbar {
+    width: 8px;
+}
+
+#emote_grid::-webkit-scrollbar-thumb {
+    background: rgba(128, 128, 128, 0.5);
+    border-radius: 4px;
+}
+
+.emote_group_label {
+    color: #adadb8;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 8px 2px 4px;
+}
+
+.emote_group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+}
+
+.picker_emote {
+    width: 30px;
+    height: 30px;
+    object-fit: contain;
+    padding: 3px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.picker_emote:hover {
+    background: rgba(145, 71, 255, 0.4);
+}
+
+.emote_none {
+    color: #adadb8;
+    font-size: 13px;
+    padding: 12px 4px;
+    text-align: center;
+}
+
 @keyframes keychat-pulse {
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.35); }
