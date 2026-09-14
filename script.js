@@ -507,7 +507,7 @@ Chat = {
             right: '.chat_line { text-align: right; } .chat_line.event_line { box-shadow: inset -3px 0 0 #b8b8be; }\n',
             // Near-native Twitch chat: Inter font, normal weight, bold names, tight
             // spacing, subtle row hover — but keeps all KeyChat features (7TV emotes etc.)
-            twitch: '#chat_container { font-weight: 400; font-family: "Inter", "Segoe UI", Roboto, sans-serif; }\n' +
+            twitch: '#chat_container { font-weight: 400; }\n' +
                 '.chat_line { line-height: 1.4; padding: 5px 20px 5px 10px; }\n' +
                 '.nick { font-weight: 700; }\n' +
                 '.message, .event_text { font-weight: 400; }\n' +
@@ -518,6 +518,9 @@ Chat = {
             extraCSS += themes[Chat.info.theme];
             if (Chat.info.theme === 'right') extraCSS += '.chat_line { margin-left: auto; }\n';
             if (Chat.info.theme === 'bubbles' && Chat.info.lightMode) extraCSS += '.chat_line { background: rgba(0,0,0,.07); }\n';
+            // Twitch theme defaults to Inter, but only when no font is explicitly chosen —
+            // otherwise the Font dropdown would do nothing
+            if (Chat.info.theme === 'twitch' && !Chat.info.font) extraCSS += '#chat_container { font-family: "Inter", "Segoe UI", Roboto, sans-serif; }\n';
         }
         if (Chat.info.alternate) {
             var stripe = Chat.info.background === 'light' ? 'rgba(0,0,0,.07)' : 'rgba(255,255,255,.06)';
