@@ -471,18 +471,38 @@ body.dock #chat_container::-webkit-scrollbar-thumb {
 }
 
 .emote_group_label {
+    position: sticky;
+    top: 0;
+    background: #1a1a1e;
     color: #adadb8;
     font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    margin: 8px 2px 4px;
+    margin: 0 -8px 4px;
+    padding: 8px 10px 4px;
+    z-index: 1;
 }
 
+/* Minor spacing so each channel's emotes read as their own block */
 .emote_group {
     display: flex;
     flex-wrap: wrap;
     gap: 2px;
+    margin-bottom: 14px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.emote_group:last-child {
+    border-bottom: none;
+    margin-bottom: 2px;
+}
+
+/* Each cell holds the emote plus its favorite star (star shows on hover) */
+.picker_cell {
+    position: relative;
+    display: inline-flex;
 }
 
 .picker_emote {
@@ -496,6 +516,27 @@ body.dock #chat_container::-webkit-scrollbar-thumb {
 
 .picker_emote:hover {
     background: rgba(145, 71, 255, 0.4);
+}
+
+.fav_star {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    font-size: 11px;
+    line-height: 1;
+    color: #ffcf3f;
+    cursor: pointer;
+    display: none;
+    text-shadow: 0 0 2px #000, 0 0 2px #000;
+}
+
+.picker_cell:hover .fav_star,
+.fav_star.on {
+    display: inline;
+}
+
+.fav_star:hover {
+    transform: scale(1.25);
 }
 
 .emote_none {

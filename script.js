@@ -1288,21 +1288,36 @@ Chat = {
     // to) — needs the user:read:emotes scope. Paginated. Feeds the emote picker.
     loadTwitchEmotes: function() {
         if (!Chat.auth || !Chat.auth.userId) return;
-        Chat.info.twitchEmotes = Chat.info.twitchEmotes || {};
+        Chat.info.twitchEmotes = {};
+        Chat.info.twitchOwnerNames = { '': 'Twitch', '0': 'Twitch' }; // owner id -> channel name
+        var pendingOwners = [];
         var fetchPage = function(cursor) {
             var url = 'chat/emotes/user?user_id=' + encodeURIComponent(Chat.auth.userId) + (cursor ? '&after=' + encodeURIComponent(cursor) : '');
             Chat.helix('GET', url).done(function(res) {
                 (res.data || []).forEach(function(e) {
                     if (typeof e.name === 'string' && typeof e.id === 'string' && /^[0-9a-zA-Z_]+$/.test(e.id)) {
-                        Chat.info.twitchEmotes[e.name] = 'https://static-cdn.jtvnw.net/emoticons/v2/' + e.id + '/default/dark/3.0';
+                        var owner = (e.emote_type === 'globals' || !e.owner_id) ? '' : String(e.owner_id);
+                        Chat.info.twitchEmotes[e.name] = { img: 'https://static-cdn.jtvnw.net/emoticons/v2/' + e.id + '/default/dark/3.0', owner: owner };
+                        if (owner && pendingOwners.indexOf(owner) === -1) pendingOwners.push(owner);
                     }
                 });
                 if (res.pagination && res.pagination.cursor) fetchPage(res.pagination.cursor);
+                else Chat.resolveEmoteOwners(pendingOwners);
             }).fail(function(xhr) {
                 if (xhr.status === 401) console.log('kChat: Twitch emotes need a new permission (user:read:emotes) — /logout and sign in again');
             });
         };
         fetchPage();
+    },
+
+    // Resolve emote-owner channel ids to names so sub emotes group under their channel
+    resolveEmoteOwners: function(ids) {
+        for (var i = 0; i < ids.length; i += 100) {
+            var q = ids.slice(i, i + 100).map(function(id) { return 'id=' + encodeURIComponent(id); }).join('&');
+            Chat.helix('GET', 'users?' + q).done(function(res) {
+                (res.data || []).forEach(function(u) { Chat.info.twitchOwnerNames[u.id] = u.display_name || u.login; });
+            });
+        }
     },
 
     // Slash commands: Twitch removed these from IRC in 2023, so route them to Helix.
@@ -1420,41 +1435,82 @@ Chat = {
         var $grid = $('<div id="emote_grid"></div>');
         $panel.append($search).append($grid).appendTo('body');
 
+        // Favorites (⭐) and frequently-used (🕐) are stored per browser in localStorage
+        var readLS = function(k, d) { try { return JSON.parse(localStorage.getItem(k)) || d; } catch (e) { return d; } };
+        var writeLS = function(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+        var favs = readLS('keychat_fav_emotes', []);
+        var freq = readLS('keychat_freq_emotes', {});
+        // Look up an emote's image across every source (for the fav/frequent rows)
+        var emoteImg = function(name) {
+            if (Chat.info.emotes[name]) return Chat.info.emotes[name].image;
+            if (Chat.info.twitchEmotes && Chat.info.twitchEmotes[name]) return Chat.info.twitchEmotes[name].img;
+            return null;
+        };
         var insertEmote = function(name) {
             var cur = $input.val();
             $input.val((cur ? cur.replace(/\s*$/, '') + ' ' : '') + name + ' ');
             $input.focus();
+            freq[name] = (freq[name] || 0) + 1;
+            writeLS('keychat_freq_emotes', freq);
+        };
+        var toggleFav = function(name) {
+            var i = favs.indexOf(name);
+            if (i > -1) favs.splice(i, 1); else favs.unshift(name);
+            writeLS('keychat_fav_emotes', favs);
+            renderGrid($search.val());
+        };
+        var buildCell = function(name, img) {
+            var $cell = $('<span class="picker_cell"></span>');
+            $('<img class="picker_emote">').attr('src', img).attr('title', name).attr('alt', name).attr('loading', 'lazy')
+                .on('click', function() { insertEmote(name); }).appendTo($cell);
+            $('<span class="fav_star"></span>').addClass(favs.indexOf(name) > -1 ? 'on' : '').text(favs.indexOf(name) > -1 ? '★' : '☆')
+                .attr('title', 'Favorite').on('click', function(e) { e.stopPropagation(); toggleFav(name); }).appendTo($cell);
+            return $cell;
         };
         var renderGrid = function(filter) {
             $grid.empty();
             filter = (filter || '').toLowerCase();
             var match = function(name) { return !filter || name.toLowerCase().indexOf(filter) > -1; };
-            // Your channel's emotes come first, then your Twitch set (subs + global),
-            // then the third-party globals — no cap, lazy-loaded images for speed.
-            var channel = [], globals = { '7TV': [], 'BTTV': [], 'FFZ': [] }, twitch = [];
+            var ordered = []; // [label, [{name,img}]]
+
+            // ⭐ Favorites and 🕐 Frequently used (skipped while searching)
+            if (!filter) {
+                var favItems = favs.map(function(n) { var im = emoteImg(n); return im ? { name: n, img: im } : null; }).filter(Boolean);
+                if (favItems.length) ordered.push(['⭐ Favorites', favItems]);
+                var freqItems = Object.keys(freq).sort(function(a, b) { return freq[b] - freq[a]; }).slice(0, 24)
+                    .map(function(n) { var im = emoteImg(n); return im ? { name: n, img: im } : null; }).filter(Boolean);
+                if (freqItems.length) ordered.push(['🕐 Frequently used', freqItems]);
+            }
+
+            // Your channel's 7TV/BTTV/FFZ emotes, then the third-party globals
+            var channel = [], globals = { '7TV': [], 'BTTV': [], 'FFZ': [] };
             Object.keys(Chat.info.emotes).sort().forEach(function(name) {
                 if (!match(name)) return;
-                var e = Chat.info.emotes[name];
-                var item = { name: name, img: e.image };
+                var e = Chat.info.emotes[name], item = { name: name, img: e.image };
                 if (e.origin && e.origin !== 'Global') channel.push(item);
                 else (globals[e.provider] || (globals[e.provider] = [])).push(item);
             });
+            if (channel.length) ordered.push(['This channel', channel]);
+
+            // Your Twitch emotes, split into a section per owning channel (subs), globals first
+            var byOwner = {};
             Object.keys(Chat.info.twitchEmotes || {}).sort().forEach(function(name) {
-                if (match(name)) twitch.push({ name: name, img: Chat.info.twitchEmotes[name] });
+                if (!match(name)) return;
+                var e = Chat.info.twitchEmotes[name];
+                (byOwner[e.owner] = byOwner[e.owner] || []).push({ name: name, img: e.img });
             });
-            var ordered = [];
-            if (channel.length) ordered.push(['Channel', channel]);
-            if (twitch.length) ordered.push(['Twitch (subs & global)', twitch]);
+            if (byOwner['']) ordered.push(['Twitch global', byOwner['']]);
+            Object.keys(byOwner).filter(function(o) { return o !== ''; })
+                .sort(function(a, b) { return (Chat.info.twitchOwnerNames[a] || a).toLowerCase() < (Chat.info.twitchOwnerNames[b] || b).toLowerCase() ? -1 : 1; })
+                .forEach(function(o) { ordered.push([Chat.info.twitchOwnerNames[o] || 'Twitch sub', byOwner[o]]); });
+
             ['7TV', 'BTTV', 'FFZ'].forEach(function(p) { if (globals[p] && globals[p].length) ordered.push([p + ' global', globals[p]]); });
+
             var total = 0;
             ordered.forEach(function(grp) {
-                $grid.append($('<div class="emote_group_label"></div>').text(grp[0] + ' (' + grp[1].length + ')'));
+                $grid.append($('<div class="emote_group_label"></div>').text(grp[0] + ' · ' + grp[1].length));
                 var $g = $('<div class="emote_group"></div>');
-                grp[1].forEach(function(em) {
-                    total++;
-                    $('<img class="picker_emote">').attr('src', em.img).attr('title', em.name).attr('alt', em.name).attr('loading', 'lazy')
-                        .on('click', function() { insertEmote(em.name); }).appendTo($g);
-                });
+                grp[1].forEach(function(em) { total++; buildCell(em.name, em.img).appendTo($g); });
                 $grid.append($g);
             });
             if (!total) $grid.append($('<div class="emote_none">No emotes yet — sets may still be loading, or /logout &amp; sign in again to load your Twitch sub emotes</div>'));
