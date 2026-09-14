@@ -786,9 +786,15 @@ Chat = {
                 var canModerate = !iAmThem && !targetIsBroadcaster && (!targetIsMod || iAmBroadcaster);
                 if (canModerate) {
                     $chatLine.attr('data-userid', info['user-id'] || '');
+                    // Clean Twitch-style SVG glyphs (slash / clock / trash) instead of faint emoji
+                    Chat._modIcons = Chat._modIcons || {
+                        ban: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="5.6" y1="5.6" x2="18.4" y2="18.4"/></svg>',
+                        timeout: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>',
+                        'delete': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 20 6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m2 0v14a2 2 0 01-2 2H8a2 2 0 01-2-2V6"/></svg>'
+                    };
                     var $tools = $('<span></span>').addClass('mod_tools');
-                    [['ban', '🔨', 'Ban (click twice)'], ['timeout', '⏱', 'Timeout 10m (click twice)'], ['delete', '🗑', 'Delete message']].forEach(function(b) {
-                        $tools.append($('<button></button>').attr('data-act', b[0]).attr('title', b[2]).text(b[1]));
+                    [['ban', 'Ban (click twice)'], ['timeout', 'Timeout 10m (click twice)'], ['delete', 'Delete message']].forEach(function(b) {
+                        $tools.append($('<button></button>').attr('data-act', b[0]).attr('title', b[1]).html(Chat._modIcons[b[0]]));
                     });
                     $userInfo.append($tools);
                 }
@@ -1208,7 +1214,7 @@ Chat = {
             '?client_id=' + encodeURIComponent(KEYCHAT_CLIENT_ID) +
             '&redirect_uri=' + encodeURIComponent(window.location.origin + window.location.pathname) +
             '&response_type=token' +
-            '&scope=' + encodeURIComponent('chat:read chat:edit moderator:manage:banned_users moderator:manage:chat_messages moderator:manage:chat_settings moderator:manage:announcements channel:manage:vips channel:manage:moderators channel:read:redemptions') +
+            '&scope=' + encodeURIComponent('chat:read chat:edit moderator:manage:banned_users moderator:manage:chat_messages moderator:manage:chat_settings moderator:manage:announcements channel:manage:vips channel:manage:moderators channel:read:redemptions user:read:emotes') +
             '&state=' + encodeURIComponent(state);
     },
 
@@ -1276,6 +1282,27 @@ Chat = {
                 Chat.writeEvent('⚠️', 'Mod action failed: ' + why, 'mode');
             });
         });
+    },
+
+    // Your full Twitch emote set (global + sub emotes from every channel you're subbed
+    // to) — needs the user:read:emotes scope. Paginated. Feeds the emote picker.
+    loadTwitchEmotes: function() {
+        if (!Chat.auth || !Chat.auth.userId) return;
+        Chat.info.twitchEmotes = Chat.info.twitchEmotes || {};
+        var fetchPage = function(cursor) {
+            var url = 'chat/emotes/user?user_id=' + encodeURIComponent(Chat.auth.userId) + (cursor ? '&after=' + encodeURIComponent(cursor) : '');
+            Chat.helix('GET', url).done(function(res) {
+                (res.data || []).forEach(function(e) {
+                    if (typeof e.name === 'string' && typeof e.id === 'string' && /^[0-9a-zA-Z_]+$/.test(e.id)) {
+                        Chat.info.twitchEmotes[e.name] = 'https://static-cdn.jtvnw.net/emoticons/v2/' + e.id + '/default/dark/3.0';
+                    }
+                });
+                if (res.pagination && res.pagination.cursor) fetchPage(res.pagination.cursor);
+            }).fail(function(xhr) {
+                if (xhr.status === 401) console.log('kChat: Twitch emotes need a new permission (user:read:emotes) — /logout and sign in again');
+            });
+        };
+        fetchPage();
     },
 
     // Slash commands: Twitch removed these from IRC in 2023, so route them to Helix.
@@ -1401,25 +1428,36 @@ Chat = {
         var renderGrid = function(filter) {
             $grid.empty();
             filter = (filter || '').toLowerCase();
-            var groups = { '7TV': [], 'BTTV': [], 'FFZ': [] };
+            var match = function(name) { return !filter || name.toLowerCase().indexOf(filter) > -1; };
+            // Your channel's emotes come first, then your Twitch set (subs + global),
+            // then the third-party globals — no cap, lazy-loaded images for speed.
+            var channel = [], globals = { '7TV': [], 'BTTV': [], 'FFZ': [] }, twitch = [];
             Object.keys(Chat.info.emotes).sort().forEach(function(name) {
-                if (filter && name.toLowerCase().indexOf(filter) === -1) return;
+                if (!match(name)) return;
                 var e = Chat.info.emotes[name];
-                (groups[e.provider] || (groups[e.provider] = [])).push(name);
+                var item = { name: name, img: e.image };
+                if (e.origin && e.origin !== 'Global') channel.push(item);
+                else (globals[e.provider] || (globals[e.provider] = [])).push(item);
             });
+            Object.keys(Chat.info.twitchEmotes || {}).sort().forEach(function(name) {
+                if (match(name)) twitch.push({ name: name, img: Chat.info.twitchEmotes[name] });
+            });
+            var ordered = [];
+            if (channel.length) ordered.push(['Channel', channel]);
+            if (twitch.length) ordered.push(['Twitch (subs & global)', twitch]);
+            ['7TV', 'BTTV', 'FFZ'].forEach(function(p) { if (globals[p] && globals[p].length) ordered.push([p + ' global', globals[p]]); });
             var total = 0;
-            Object.keys(groups).forEach(function(prov) {
-                if (!groups[prov].length) return;
-                $grid.append($('<div class="emote_group_label"></div>').text(prov + ' (' + groups[prov].length + ')'));
+            ordered.forEach(function(grp) {
+                $grid.append($('<div class="emote_group_label"></div>').text(grp[0] + ' (' + grp[1].length + ')'));
                 var $g = $('<div class="emote_group"></div>');
-                groups[prov].slice(0, 400).forEach(function(name) {
+                grp[1].forEach(function(em) {
                     total++;
-                    $('<img class="picker_emote">').attr('src', Chat.info.emotes[name].image).attr('title', name).attr('alt', name)
-                        .on('click', function() { insertEmote(name); }).appendTo($g);
+                    $('<img class="picker_emote">').attr('src', em.img).attr('title', em.name).attr('alt', em.name).attr('loading', 'lazy')
+                        .on('click', function() { insertEmote(em.name); }).appendTo($g);
                 });
                 $grid.append($g);
             });
-            if (!total) $grid.append($('<div class="emote_none">No emotes — the channel\'s sets may still be loading</div>'));
+            if (!total) $grid.append($('<div class="emote_none">No emotes yet — sets may still be loading, or /logout &amp; sign in again to load your Twitch sub emotes</div>'));
         };
         $emoteBtn.on('click', function(e) {
             e.stopPropagation();
@@ -1760,6 +1798,7 @@ Chat = {
             if (Chat.info.modMode) {
                 if (Chat.auth) {
                     Chat.setupModTools();
+                    Chat.loadTwitchEmotes();
                     if (Chat.info.channels.length) Chat.setupChatBox();
                 } else {
                     Chat.setupLoginButton();

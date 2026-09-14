@@ -95,6 +95,7 @@ Add `mod=true` to a **docked** KeyChat URL and a "Log in with Twitch" button app
 
 - Hover any Twitch message for 🗑 delete, ⏱ 10-minute timeout, 🔨 ban (timeout/ban need a second click within 3s to confirm)
 - A chat box appears at the bottom so you can talk in your primary channel from the dock, with an **emote picker** (😀 button) — searchable, grouped by 7TV/BTTV/FFZ; click to insert
+- The emote picker also includes your **Twitch emotes** (global + sub emotes from every channel you're subscribed to) once you grant the `user:read:emotes` permission (`/logout` and sign in again)
 - **Slash commands work** — `/ban`, `/unban`, `/timeout`, `/untimeout`, `/clear`, `/slow`, `/followers`, `/subscribers`, `/emoteonly`, `/uniquechat` (+ their `off` variants), `/vip`, `/unvip`, `/mod`, `/unmod`, `/announce`. Twitch removed commands from IRC in 2023, so KeyChat routes them through the Helix API. `/logout` re-signs-in (needed once to grant the mode/VIP/announce permissions).
 - Actions work only in channels where your account actually has mod powers — Twitch enforces this server-side
 
